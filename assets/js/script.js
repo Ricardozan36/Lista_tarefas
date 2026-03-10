@@ -1,18 +1,25 @@
-// 1. Seleção de Elementos (IDs atualizados para Português)
+
+// Seleção dos elementos do HTML para manipulação via JS
 const formulario = document.querySelector('#formulario-tarefa');
 const listaTarefas = document.querySelector('#lista-tarefas');
 const filtroPrioridade = document.querySelector('#prioridade-filtro');
 const filtroStatus = document.querySelector('#status-filtro');
 
-// 2. Estado da Aplicação
+
+// Lógica para garantir o ID durante a edição de uma tarefa
+const inputIdEdicao = document.querySelector('#tarefa-id-edicao') || Object.assign(document.createElement('input'), {type: 'hidden', id: 'tarefa-id-edicao'});
+if (!document.querySelector('#tarefa-id-edicao')) formulario.appendChild(inputIdEdicao);
+
+
+// Salva os dados utilizando LocalStorage
 let tarefas = JSON.parse(localStorage.getItem('minhas-tarefas')) || [];
 
-// 3. Funções de Suporte
 function atualizarDados() {
     localStorage.setItem('minhas-tarefas', JSON.stringify(tarefas));
     renderizar();
 }
 
+// Define a cor da prioridade baixa, media e alta
 function obterCorPrioridade(prioridade) {
     switch (prioridade) {
         case 'Alta': return '#dc3545';
@@ -22,20 +29,21 @@ function obterCorPrioridade(prioridade) {
     }
 }
 
-// 4. Lógica de Renderização
+//Renderização, limpa a lista e reconstrói na tela
 function renderizar() {
     listaTarefas.innerHTML = '';
 
     const prioridadeSelecionada = filtroPrioridade.value;
     const statusSelecionado = filtroStatus.value;
 
-    // Filtra as tarefas baseado nos dropdowns da Navbar
+// Aplica os filtros de Prioridade e Status selecionados na navbar
     const tarefasFiltradas = tarefas.filter(t => {
         const matchPrioridade = prioridadeSelecionada === 'Todas' || t.prioridade === prioridadeSelecionada;
         const matchStatus = statusSelecionado === 'Todos' || t.status === statusSelecionado;
         return matchPrioridade && matchStatus;
     });
 
+    // Mensagem caso não haja tarefas cadastradas
     if (tarefasFiltradas.length === 0) {
         listaTarefas.innerHTML = `
             <div style="text-align:center; padding:40px; color:#666;">
@@ -44,11 +52,9 @@ function renderizar() {
         return;
     }
 
-    
-
+    // Cria dinamicamente o HTML de cada tarefa filtrada
     tarefasFiltradas.forEach(t => {
         const item = document.createElement('div');
-        // Classes CSS atualizadas: item-tarefa e concluida
         item.className = `item-tarefa ${t.prioridade} ${t.status === 'Concluída' ? 'concluida' : ''}`;
 
         item.innerHTML = `
@@ -62,6 +68,9 @@ function renderizar() {
                 <strong>${t.status}</strong>
             </div>
             <div class="acoes">
+                <button class="btn-acao btn-editar" onclick="prepararEdicao(${t.id})" title="Editar" style="color: #3b71ca;">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
                 <button class="btn-acao btn-concluir" onclick="alternarStatus(${t.id})" title="Marcar como concluída">
                     <i class="fa-solid ${t.status === 'Concluída' ? 'fa-circle-left' : 'fa-circle-check'}"></i>
                 </button>
@@ -74,27 +83,66 @@ function renderizar() {
     });
 }
 
-// 5. Gerenciamento de Tarefas
+// Função para preencher o formulário com os dados da tarefa a ser editada
+window.prepararEdicao = (id) => {
+    const tarefa = tarefas.find(t => t.id === id);
+    if (tarefa) {
+        document.getElementById('titulo-tarefa').value = tarefa.titulo;
+        document.getElementById('descricao-tarefa').value = tarefa.descricao;
+        document.getElementById('prioridade-tarefa').value = tarefa.prioridade;
+        document.getElementById('tarefa-id-edicao').value = tarefa.id;
 
-// Adicionar Nova (IDs dos inputs atualizados)
+        // Altera visualmente o botão para indicar modo de edição
+        const btn = document.getElementById('btn-adicionar');
+        btn.textContent = "Salvar Alterações";
+        btn.style.background = "#ffc107";
+        
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+};
+
+// Reprocessa as informações da tarefa
 formulario.addEventListener('submit', (e) => {
     e.preventDefault();
 
-    const novaTarefa = {
-        id: Date.now(),
-        titulo: document.getElementById('titulo-tarefa').value,
-        descricao: document.getElementById('descricao-tarefa').value,
-        prioridade: document.getElementById('prioridade-tarefa').value,
-        dataCriacao: new Date().toLocaleDateString('pt-BR'),
-        status: 'Pendente'
-    };
+    const idEdicao = document.getElementById('tarefa-id-edicao').value;
+    const titulo = document.getElementById('titulo-tarefa').value;
+    const descricao = document.getElementById('descricao-tarefa').value;
+    const prioridade = document.getElementById('prioridade-tarefa').value;
 
-    tarefas.push(novaTarefa);
+// Edição da tarefa, localiza a tarefa pelo ID e substitui os dados
+    if (idEdicao) {
+        tarefas = tarefas.map(t => {
+            if (t.id === parseInt(idEdicao)) {
+                return { ...t, titulo, descricao, prioridade };
+            }
+            return t;
+        });
+        
+        // Retorna o botão ao estado original de "Adicionar"
+        const btn = document.getElementById('btn-adicionar');
+        btn.textContent = "Adicionar";
+        btn.style.background = "#3b71ca";
+        document.getElementById('tarefa-id-edicao').value = "";
+
+// Adição tarefa, cria um novo objeto de tarefa com ID único
+    } else {
+        const novaTarefa = {
+            id: Date.now(),
+            titulo,
+            descricao,
+            prioridade,
+            dataCriacao: new Date().toLocaleDateString('pt-BR'),
+            status: 'Pendente'
+        };
+        tarefas.push(novaTarefa);
+    }
+
     formulario.reset();
     atualizarDados();
 });
 
-// Alternar Status (Pendente / Concluída)
+// Altera o status entre 'Pendente' e 'Concluída'
 window.alternarStatus = (id) => {
     tarefas = tarefas.map(t => {
         if (t.id === id) {
@@ -105,17 +153,23 @@ window.alternarStatus = (id) => {
     atualizarDados();
 };
 
-// Excluir
+// Remove a tarefa com confirmação
 window.excluirTarefa = (id) => {
     if (confirm('Deseja excluir esta tarefa?')) {
-        tarefas = tarefas.filter(t => t.id !== id);
-        atualizarDados();
+        const botao = event.currentTarget; 
+        const card = botao.closest('.item-tarefa'); 
+
+        card.classList.add('removendo');
+
+        setTimeout(() => {
+            tarefas = tarefas.filter(t => t.id !== id);
+            atualizarDados();
+        }, 400);
     }
 };
 
-// 6. Listeners para os Filtros
+// Re-renderização quando o usuário muda o filtro
 filtroPrioridade.addEventListener('change', renderizar);
 filtroStatus.addEventListener('change', renderizar);
 
-// Inicialização
 renderizar();
